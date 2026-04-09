@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VideoMind AI — Sign In / Register</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/css/auth.css">
+</head>
+<body>
+  <div class="bg-orbs">
+    <div class="orb orb-1"></div>
+    <div class="orb orb-2"></div>
+    <div class="orb orb-3"></div>
+  </div>
+
+  <main class="auth-container">
+    <!-- Left Column: Branding -->
+    <div class="auth-brand-section">
+      <div class="brand">
+        <span class="brand-icon">🎬</span>
+        <span class="brand-name">VideoMind <span class="brand-ai">AI</span></span>
+      </div>
+      <h1 class="hero-text">Unlock the Power of <br><span class="gradient-text">AI Video Intelligence</span></h1>
+      <p class="hero-desc">Upload any video and instantly get answers, summaries, quizzes, and transcripts — all powered by Groq AI.</p>
+      
+      <div class="features-list">
+        <div class="feature-item">
+          <span class="f-icon">🎙️</span>
+          <div>
+            <strong>Whisper Transcription</strong>
+            <p>Accurate speech-to-text from any video in seconds</p>
+          </div>
+        </div>
+        <div class="feature-item">
+          <span class="f-icon">🖼️</span>
+          <div>
+            <strong>Vision Frame Analysis</strong>
+            <p>AI analyses key frames to understand visual content</p>
+          </div>
+        </div>
+        <div class="feature-item">
+          <span class="f-icon">💬</span>
+          <div>
+            <strong>Natural Language Q&A</strong>
+            <p>Ask anything — get instant, accurate answers</p>
+          </div>
+        </div>
+        <div class="feature-item">
+          <span class="f-icon">🧠</span>
+          <div>
+            <strong>Auto Quiz Generation</strong>
+            <p>Test comprehension with AI-generated quizzes</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right Column: Form -->
+    <div class="auth-form-section">
+      <div class="auth-card glass">
+        <div class="tabs">
+          <button class="tab-btn active" id="tab-login-btn">Sign In</button>
+          <button class="tab-btn" id="tab-register-btn">Create Account</button>
+        </div>
+
+        <!-- Login Form -->
+        <div id="login-panel" class="auth-panel active">
+          <div class="panel-header">
+            <h2>Welcome back 👋</h2>
+            <p>Sign in to your VideoMind account</p>
+          </div>
+          
+          <div id="login-error" class="error-msg hidden"></div>
+
+          <form id="login-form">
+            <div class="form-group">
+              <label for="login-id">Username or Email</label>
+              <div class="input-wrap">
+                <span class="input-icon">👤</span>
+                <input type="text" id="login-id" name="identifier" placeholder="Enter username or email" required>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label for="login-pass">Password</label>
+              <div class="input-wrap">
+                <span class="input-icon">🔒</span>
+                <input type="password" id="login-pass" name="password" placeholder="Enter your password" required>
+                <button type="button" class="btn-toggle-pass" title="Show/Hide">👁️</button>
+              </div>
+            </div>
+
+            <div class="form-opt">
+              <label class="checkbox-container">
+                <input type="checkbox" name="remember">
+                <span class="checkmark"></span>
+                Remember me
+              </label>
+              <a href="#" class="forgot-link">Forgot password?</a>
+            </div>
+
+            <button type="submit" class="btn btn-primary btn-full" id="btn-login-submit">Sign In</button>
+          </form>
+          
+          <p class="switch-p">Don't have an account? <a href="#" id="go-to-register">Create one free →</a></p>
+        </div>
+
+        <!-- Register Form -->
+        <div id="register-panel" class="auth-panel">
+          <div class="panel-header">
+            <h2>Get Started 🚀</h2>
+            <p>Create your new account in seconds</p>
+          </div>
+
+          <div id="register-error" class="error-msg hidden"></div>
+
+          <form id="register-form">
+            <div class="form-group">
+              <label for="reg-user">Username</label>
+              <div class="input-wrap">
+                <span class="input-icon">👤</span>
+                <input type="text" id="reg-user" name="username" placeholder="Choose a username" required minlength="3">
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label for="reg-email">Email Address</label>
+              <div class="input-wrap">
+                <span class="input-icon">✉️</span>
+                <input type="email" id="reg-email" name="email" placeholder="you@example.com" required>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label for="reg-pass">Password</label>
+              <div class="input-wrap">
+                <span class="input-icon">🔒</span>
+                <input type="password" id="reg-pass" name="password" placeholder="Min 6 characters" required minlength="6">
+                <button type="button" class="btn-toggle-pass" title="Show/Hide">👁️</button>
+              </div>
+              <div class="pass-strength">
+                <div class="strength-bar"><div id="strength-fill"></div></div>
+                <span id="strength-text">Password Strength</span>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label for="reg-pass-conf">Confirm Password</label>
+              <div class="input-wrap">
+                <span class="input-icon">🔒</span>
+                <input type="password" id="reg-pass-conf" placeholder="Confirm your password" required>
+              </div>
+            </div>
+
+            <button type="submit" class="btn btn-primary btn-full" id="btn-register-submit">Create Account</button>
+          </form>
+
+          <p class="switch-p">Already have an account? <a href="#" id="go-to-login">Sign in here →</a></p>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <footer class="auth-footer">
+    <p>&copy; 2024 VideoMind AI · Intelligent Video Analysis</p>
+  </footer>
+
+  <script src="/static/js/auth.js"></script>
+</body>
+</html>

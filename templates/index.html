@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="VideoMind AI — Upload any video and ask questions, get summaries, quizzes, and transcripts powered by Groq AI." />
+  <title>VideoMind AI — Intelligent Video Analysis</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,300;0,14..32,400;0,14..32,500;0,14..32,600;0,14..32,700;0,14..32,800;1,14..32,400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+
+  <!-- ── Background Orbs ──────────────────────────────────────── -->
+  <div class="bg-orbs" aria-hidden="true">
+    <div class="orb orb-1"></div>
+    <div class="orb orb-2"></div>
+    <div class="orb orb-3"></div>
+  </div>
+
+  <!-- ── Navbar ──────────────────────────────────────────────── -->
+  <nav class="navbar" role="navigation" aria-label="Main navigation">
+    <div class="nav-inner">
+      <div class="nav-brand">
+        <span class="brand-icon">🎬</span>
+        <span class="brand-name">VideoMind <span class="brand-ai">AI</span></span>
+      </div>
+      <div class="nav-actions">
+        <a href="#uploader" class="nav-link">Upload</a>
+        <a href="#workspace" class="nav-link">Workspace</a>
+        <button id="btn-settings" class="btn-icon" title="Settings" aria-label="Open settings">⚙️</button>
+        <div class="user-pill" id="user-pill">
+          <span class="user-avatar">{{ user.username[0].upper() }}</span>
+          <span class="user-name">{{ user.username }}</span>
+          <button id="btn-logout" class="btn-icon" title="Logout" aria-label="Logout">🚪</button>
+        </div>
+      </div>
+    </div>
+  </nav>
+
+  <!-- ── Settings Modal ───────────────────────────────────────── -->
+  <div id="settings-modal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="modal-title" hidden>
+    <div class="modal-card">
+      <div class="modal-header">
+        <h2 id="modal-title">⚙️ Settings</h2>
+        <button id="btn-close-settings" class="btn-icon" aria-label="Close">✕</button>
+      </div>
+      <div class="modal-body">
+        <label class="form-label" for="input-api-key">
+          🔑 Groq API Key
+          <a href="https://console.groq.com/keys" target="_blank" rel="noopener" class="label-link">Get free key →</a>
+        </label>
+        <input type="password" id="input-api-key" class="form-input" placeholder="gsk_..." autocomplete="off" />
+        <p class="form-hint">Stored only in your browser session. Never persisted on the server.</p>
+        <button id="btn-save-key" class="btn btn-primary btn-full">Save Key</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Hero ─────────────────────────────────────────────────── -->
+  <header class="hero" id="top">
+    <div class="hero-inner">
+      <div class="hero-badge">⚡ Powered by Groq · Whisper · Llama 3.3 · Vision</div>
+      <h1 class="hero-title">Ask <span class="gradient-text">Anything</span> About<br>Any Video</h1>
+      <p class="hero-subtitle">Upload a video and instantly get answers, summaries, quizzes, and transcripts — all powered by AI.</p>
+      <div class="hero-chips">
+        <span class="chip">🎙️ Transcription</span>
+        <span class="chip">🖼️ Vision</span>
+        <span class="chip">💬 Q&amp;A</span>
+        <span class="chip">📄 Summary</span>
+        <span class="chip">🧠 Quiz</span>
+        <span class="chip">📝 Transcript</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- ── Main ─────────────────────────────────────────────────── -->
+  <main class="main-content">
+
+    <!-- ── Upload Section ───────────────────────────────────── -->
+    <section class="section upload-section" id="uploader">
+
+      <!-- Upload Type Tabs -->
+      <div class="upload-tabs" role="tablist">
+        <button class="u-tab active" id="tab-upload-file" role="tab" aria-selected="true">📁 Upload File</button>
+        <button class="u-tab" id="tab-upload-yt" role="tab" aria-selected="false">🎥 YouTube Link</button>
+      </div>
+
+      <!-- Upload Card -->
+      <div class="upload-card glass-card" id="upload-card">
+
+        <!-- File Upload Panel -->
+        <div id="panel-upload-file" class="upload-panel">
+          <div class="drop-zone" id="drop-zone" role="button" tabindex="0" aria-label="Drop video or click to browse">
+            <input type="file" id="file-input" accept="video/*" hidden>
+
+            <!-- State: Idle -->
+            <div id="dz-idle" class="dz-state">
+              <div class="dz-cloud">☁️</div>
+              <p class="dz-title">Drop your video here or <span class="dz-link">click to browse</span></p>
+              <p class="dz-formats">MP4 · MOV · AVI · MKV · WebM</p>
+            </div>
+
+            <!-- State: File Selected -->
+            <div id="dz-selected" class="dz-state hidden">
+              <div class="dz-file-icon">🎞️</div>
+              <p class="dz-filename" id="dz-filename-text"></p>
+              <p class="dz-filesize" id="dz-filesize-text"></p>
+              <div class="dz-selected-actions">
+                <button id="btn-upload" class="btn btn-primary btn-lg">🚀 Analyze with Groq AI</button>
+                <button id="btn-change-file" class="btn btn-ghost-sm">Change File</button>
+              </div>
+            </div>
+
+            <!-- State: Processing -->
+            <div id="dz-uploading" class="dz-state hidden">
+              <div class="spinner"></div>
+              <p class="dz-status" id="upload-status-text">Analysing with Groq AI...</p>
+              <div class="progress-track">
+                <div class="progress-fill" id="progress-bar" style="width:0%"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- YouTube Panel -->
+        <div id="panel-upload-yt" class="upload-panel hidden">
+          <div class="yt-panel">
+            <div class="yt-icon-wrap">🎬</div>
+            <h3 class="yt-title">Paste a YouTube Link</h3>
+            <div class="yt-input-group">
+              <input type="url" id="yt-url-input" class="yt-input" placeholder="https://www.youtube.com/watch?v=..." />
+              <button id="btn-yt-process" class="btn btn-primary">✨ Analyze</button>
+            </div>
+            <p class="yt-hint">We'll extract the transcript and analyse the content using Groq AI.</p>
+
+            <!-- YouTube Processing State -->
+            <div id="yt-processing" class="hidden" style="margin-top:2rem;text-align:center;">
+              <div class="spinner"></div>
+              <p class="dz-status">Fetching YouTube content...</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── Analysis Success (hidden until complete) ─────── -->
+        <div class="success-card hidden" id="upload-success">
+          <div class="success-banner">
+            <span class="success-checkmark">✅</span>
+            <div>
+              <strong class="success-label">Analysis Complete!</strong>
+              <p class="success-name" id="success-filename"></p>
+            </div>
+          </div>
+          <!-- Video Player (local file only) -->
+          <div class="player-area" id="player-area">
+            <video id="video-preview" class="video-player" controls preload="metadata"></video>
+          </div>
+          <!-- YouTube placeholder -->
+          <div class="yt-done-placeholder hidden" id="yt-done-placeholder">
+            <div style="font-size:3rem;">🎬</div>
+            <p>YouTube video analysed successfully.</p>
+          </div>
+          <div class="success-footer">
+            <button id="btn-new-video" class="btn btn-ghost-sm">📂 Upload Another</button>
+            <div class="scroll-cue">
+              <span>Scroll to AI Workspace</span>
+              <div class="bounce-icon">↓</div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ── AI Workspace ──────────────────────────────────────── -->
+    <section class="section workspace hidden" id="workspace">
+
+      <div class="workspace-header">
+        <h2 class="ws-title">🧠 AI Workspace</h2>
+        <p class="ws-subtitle">Analyzing: <span id="ws-filename" class="filename-tag"></span></p>
+      </div>
+
+      <!-- Tab Nav -->
+      <div class="ws-tabs" role="tablist" aria-label="AI features">
+        <button class="ws-tab active" id="tab-qa" role="tab" aria-selected="true" data-panel="panel-qa">💬 Q&amp;A</button>
+        <button class="ws-tab" id="tab-summary" role="tab" aria-selected="false" data-panel="panel-summary">📄 Summary</button>
+        <button class="ws-tab" id="tab-quiz" role="tab" aria-selected="false" data-panel="panel-quiz">🧠 Quiz</button>
+        <button class="ws-tab" id="tab-transcript" role="tab" aria-selected="false" data-panel="panel-transcript">📝 Transcript</button>
+      </div>
+
+      <!-- ── Panel: Q&A ─────────────────────────────────── -->
+      <div class="ws-panel active" id="panel-qa" role="tabpanel">
+        <div class="chat-window" id="chat-messages" aria-live="polite">
+          <div class="chat-welcome">
+            <div class="welcome-bot">🤖</div>
+            <h3>Ready to Answer Your Questions</h3>
+            <p>Ask anything about the video — content, facts, timestamps, concepts, or anything else.</p>
+            <div class="sample-chips">
+              <button class="sample-btn" data-question="What is the main topic of this video?">What is the main topic?</button>
+              <button class="sample-btn" data-question="What are the key points discussed?">Key points?</button>
+              <button class="sample-btn" data-question="Who is speaking and what are they explaining?">Who is speaking?</button>
+              <button class="sample-btn" data-question="Give me a summary of what happens in this video.">Full summary?</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="chat-footer">
+          <div class="chat-input-wrap">
+            <textarea id="question-input" class="chat-input" placeholder="Ask a question about the video..." rows="1"></textarea>
+            <button id="btn-ask" class="btn-send" aria-label="Send">➤</button>
+          </div>
+          <!-- Action Row -->
+          <div class="action-row">
+            <button id="btn-summarize-global" class="action-btn">✨ Generate Summary</button>
+            <div class="action-group-quiz">
+              <select id="quick-quiz-count" class="quiz-count-select">
+                <option value="3">3 Qs</option>
+                <option value="5" selected>5 Qs</option>
+                <option value="10">10 Qs</option>
+              </select>
+              <button id="btn-quiz-global" class="action-btn">🧠 Quiz</button>
+            </div>
+            <button id="btn-download-pdf-global" class="action-btn">📥 PDF</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Panel: Summary ─────────────────────────────── -->
+      <div class="ws-panel hidden" id="panel-summary" role="tabpanel">
+        <div class="summary-header">
+          <button id="btn-summarize-panel" class="btn btn-primary">✨ Generate Summary</button>
+          <button id="btn-copy-summary" class="btn btn-ghost-sm hidden">📋 Copy</button>
+        </div>
+        <div class="panel-content" id="summary-content">
+          <div class="panel-placeholder">
+            <div class="ph-icon">📄</div>
+            <p>Click "Generate Summary" to get a structured breakdown of the video.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Panel: Quiz ────────────────────────────────── -->
+      <div class="ws-panel hidden" id="panel-quiz" role="tabpanel">
+        <div class="quiz-header">
+          <label class="quiz-label" for="quiz-count">Questions:</label>
+          <select id="quiz-count" class="quiz-count-select">
+            <option value="3">3</option>
+            <option value="5" selected>5</option>
+            <option value="7">7</option>
+            <option value="10">10</option>
+          </select>
+          <button id="btn-quiz-panel" class="btn btn-primary">🧠 Generate Quiz</button>
+        </div>
+        <div class="panel-content" id="quiz-content">
+          <div class="panel-placeholder">
+            <div class="ph-icon">🧠</div>
+            <p>Click "Generate Quiz" or use the Quiz button in the Q&A tab.</p>
+          </div>
+        </div>
+        <div class="quiz-score hidden" id="quiz-score"></div>
+      </div>
+
+      <!-- ── Panel: Transcript ──────────────────────────── -->
+      <div class="ws-panel hidden" id="panel-transcript" role="tabpanel">
+        <div class="transcript-header">
+          <button id="btn-transcript" class="btn btn-primary">📝 Extract Transcript</button>
+          <button id="btn-copy-transcript" class="btn btn-ghost-sm hidden">📋 Copy</button>
+        </div>
+        <div class="panel-content" id="transcript-content">
+          <div class="panel-placeholder">
+            <div class="ph-icon">📝</div>
+            <p>Click "Extract Transcript" to get the full text from the video.</p>
+          </div>
+        </div>
+      </div>
+
+    </section>
+  </main>
+
+  <!-- ── Footer ───────────────────────────────────────────────── -->
+  <footer class="footer">
+    <p>VideoMind AI · Built with Groq AI (Whisper + Llama 3.3 + Vision) · <a href="https://console.groq.com/keys" target="_blank" rel="noopener">Get Free API Key</a></p>
+  </footer>
+
+  <!-- ── Toast ─────────────────────────────────────────────────── -->
+  <div id="toast" class="toast" role="alert" aria-live="assertive" hidden></div>
+
+  <script src="/static/js/app.js"></script>
+</body>
+</html>
