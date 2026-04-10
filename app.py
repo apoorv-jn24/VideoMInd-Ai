@@ -19,8 +19,14 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 from dotenv import load_dotenv
 from youtube_transcript_api import YouTubeTranscriptApi
-import yt_dlp
 from fpdf import FPDF
+
+# yt-dlp is optional — used locally for YouTube audio download fallback
+try:
+    import yt_dlp as _yt_dlp
+    YT_DLP_AVAILABLE = True
+except ImportError:
+    YT_DLP_AVAILABLE = False
 
 # ─── Load environment ────────────────────────────────────────
 load_dotenv()
@@ -205,15 +211,23 @@ def extract_yt_id(url: str) -> str:
 
 
 def get_yt_details(yt_url: str) -> dict:
-    """Fetch video title and basic info from YouTube."""
-    ydl_opts = {'quiet': True, 'no_warnings': True}
-    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-        try:
-            info = ydl.extract_info(yt_url, download=False)
-            return {'title': info.get('title', 'Unknown YouTube Video'),
-                    'id': info.get('id')}
-        except:
-            return {'title': 'YouTube Video', 'id': None}
+    """Fetch video title from YouTube using lightweight HTML scraping (no yt-dlp needed)."""
+    try:
+        import urllib.request
+        req = urllib.request.Request(
+            yt_url,
+            headers={'User-Agent': 'Mozilla/5.0 (compatible; VideoMindBot/1.0)'}
+        )
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            html = resp.read().decode('utf-8', errors='replace')
+        # Extract title from og:title or <title> tag
+        m = re.search(r'<meta property="og:title" content="([^"]+)"', html)
+        if not m:
+            m = re.search(r'<title>([^<]+)</title>', html)
+        title = m.group(1).replace(' - YouTube', '').strip() if m else 'YouTube Video'
+        return {'title': title, 'id': extract_yt_id(yt_url)}
+    except Exception:
+        return {'title': 'YouTube Video', 'id': extract_yt_id(yt_url)}
 
 
 def describe_frames(frames_b64: list, groq_client) -> str:
@@ -433,48 +447,48 @@ def upload_youtube():
             transcript = " ".join([item['text'] for item in transcript_list])
             print(f'[+] Extracted YouTube transcript (API) for {v_id}')
         except Exception as api_err:
-            print(f'[!] API transcript unavailable for {v_id}: {api_err}. Falling back to Whisper...')
-            
-            # 2. Fallback: Download audio and use Whisper
-            temp_path = os.path.join(app.config['UPLOAD_FOLDER'], f"yt_{v_id}")
-            local_audio = temp_path + '.mp3'
-            
-            # Clean up old file if exists
-            if os.path.exists(local_audio):
-                try: os.remove(local_audio)
-                except: pass
-                
-            ydl_opts = {
-                'format': 'bestaudio/best',
-                'outtmpl': temp_path, # Extension added by postprocessor
-                'postprocessors': [{
-                    'key': 'FFmpegExtractAudio',
-                    'preferredcodec': 'mp3',
-                    'preferredquality': '192',
-                }],
-                'quiet': True,
-                'no_warnings': True
-            }
-            try:
-                with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                    ydl.download([yt_url])
-                
+            print(f'[!] API transcript unavailable for {v_id}: {api_err}.')
+
+            if not YT_DLP_AVAILABLE:
+                # On serverless deployments (Vercel), yt-dlp is not installed.
+                # The youtube-transcript-api is the only transcript source available.
+                transcript = '[Transcript not available for this video. YouTube auto-captions may be disabled.]'
+            else:
+                # 2. Fallback (local / Docker only): Download audio and use Whisper
+                temp_path = os.path.join(app.config['UPLOAD_FOLDER'], f'yt_{v_id}')
+                local_audio = temp_path + '.mp3'
                 if os.path.exists(local_audio):
-                    with open(local_audio, 'rb') as f:
-                        result = groq_client.audio.transcriptions.create(
-                            file=(os.path.basename(local_audio), f, 'audio/mpeg'),
-                            model=MODEL_WHISPER, response_format='text',
-                        )
-                    transcript = result if isinstance(result, str) else getattr(result, 'text', str(result))
                     try: os.remove(local_audio)
                     except: pass
-                    print(f'[+] Generated YouTube transcript (Whisper) for {v_id}')
-                else:
-                    print(f'[!] Local audio file not found after yt-dlp: {local_audio}')
-                    transcript = "[Could not generate YouTube transcript. Ensure ffmpeg is installed.]"
-            except Exception as dl_err:
-                print(f'[!] YouTube download error: {dl_err}')
-                transcript = f"[YouTube Download Failed: {str(dl_err)[:100]}]"
+                ydl_opts = {
+                    'format': 'bestaudio/best',
+                    'outtmpl': temp_path,
+                    'postprocessors': [{
+                        'key': 'FFmpegExtractAudio',
+                        'preferredcodec': 'mp3',
+                        'preferredquality': '128',
+                    }],
+                    'quiet': True,
+                    'no_warnings': True
+                }
+                try:
+                    with _yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                        ydl.download([yt_url])
+                    if os.path.exists(local_audio):
+                        with open(local_audio, 'rb') as f:
+                            result = groq_client.audio.transcriptions.create(
+                                file=(os.path.basename(local_audio), f, 'audio/mpeg'),
+                                model=MODEL_WHISPER, response_format='text',
+                            )
+                        transcript = result if isinstance(result, str) else getattr(result, 'text', str(result))
+                        try: os.remove(local_audio)
+                        except: pass
+                        print(f'[+] Generated YouTube transcript (Whisper) for {v_id}')
+                    else:
+                        transcript = '[Could not generate YouTube transcript. Ensure ffmpeg is installed.]'
+                except Exception as dl_err:
+                    print(f'[!] YouTube download error: {dl_err}')
+                    transcript = f'[YouTube Download Failed: {str(dl_err)[:100]}]'
 
         # 3. Create context session
         details = get_yt_details(yt_url)

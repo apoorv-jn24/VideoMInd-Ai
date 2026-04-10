@@ -1,0 +1,62 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Flask / SQLite DB
+instance/
+*.db
+*.sqlite
+*.sqlite3
+
+# Uploaded video/audio files
+uploads/
+*.mp4
+*.avi
+*.mov
+*.mkv
+*.webm
+*.flv
+*.mpeg
+*.mpg
+*.m4v
+*.mp3
+*.wav
+*.webm
+
+# Generated PDFs
+*.pdf
+
+# Vercel build
+.vercel/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Node (if any frontend tooling added later)
+node_modules/
