@@ -35,13 +35,18 @@ app = Flask(__name__)
 CORS(app)
 
 # ─── Config ──────────────────────────────────────────────────
-app.config['SECRET_KEY']          = os.getenv('SECRET_KEY', 'videomind-secret-key-change-in-prod-2024')
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///videomind_users.db'
+app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'videomind-secret-key-change-in-prod-2024')
+
+# ─── Vercel / Serverless: only /tmp is writable at runtime ───
+# Locally this still works fine since /tmp is always available.
+_TMP_DIR = '/tmp'
+DB_PATH  = os.path.join(_TMP_DIR, 'videomind_users.db')
+app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{DB_PATH}'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
-UPLOAD_FOLDER = os.path.join(os.path.dirname(__file__), 'uploads')
+UPLOAD_FOLDER = os.path.join(_TMP_DIR, 'uploads')
 ALLOWED_EXTENSIONS = {'mp4', 'mov', 'avi', 'mkv', 'webm', 'flv', 'mpeg', 'mpg', 'm4v'}
-MAX_CONTENT_LENGTH = 500 * 1024 * 1024
+MAX_CONTENT_LENGTH = 200 * 1024 * 1024  # 200 MB (Vercel request body limit)
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['MAX_CONTENT_LENGTH'] = MAX_CONTENT_LENGTH
@@ -87,9 +92,12 @@ def load_user(user_id):
     return db.session.get(User, int(user_id))
 
 
-# Create all tables on first run
-with app.app_context():
-    db.create_all()
+# ─── Create tables (safely, won't crash Lambda startup) ──────
+try:
+    with app.app_context():
+        db.create_all()
+except Exception as _db_err:
+    print(f'[!] DB init warning: {_db_err}')
 
 
 # ─── In-memory video context cache ───────────────────────────
