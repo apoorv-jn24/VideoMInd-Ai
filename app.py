@@ -18,8 +18,23 @@ from flask_login import (
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 from dotenv import load_dotenv
-from youtube_transcript_api import YouTubeTranscriptApi
-from fpdf import FPDF
+# youtube-transcript-api: wrapped to prevent Lambda crash if package has issues
+try:
+    from youtube_transcript_api import YouTubeTranscriptApi
+    YT_TRANSCRIPT_AVAILABLE = True
+except Exception as _yt_err:
+    print(f'[!] youtube-transcript-api import failed: {_yt_err}')
+    YouTubeTranscriptApi = None
+    YT_TRANSCRIPT_AVAILABLE = False
+
+# fpdf2: wrapped to prevent Lambda crash if Pillow/C-extension issues occur
+try:
+    from fpdf import FPDF
+    FPDF_AVAILABLE = True
+except Exception as _fpdf_err:
+    print(f'[!] fpdf2 import failed: {_fpdf_err}')
+    FPDF = None
+    FPDF_AVAILABLE = False
 
 # yt-dlp is optional — used locally for YouTube audio download fallback
 try:
@@ -384,6 +399,22 @@ def favicon():
     return '', 204
 
 
+@app.route('/health')
+def health():
+    """Public health-check — useful for diagnosing serverless crashes."""
+    import sys
+    return jsonify({
+        'status': 'ok',
+        'python': sys.version,
+        'youtube_transcript_api': YT_TRANSCRIPT_AVAILABLE,
+        'fpdf': FPDF_AVAILABLE,
+        'yt_dlp': YT_DLP_AVAILABLE,
+        'db_uri': app.config.get('SQLALCHEMY_DATABASE_URI', 'not set'),
+        'upload_folder': app.config.get('UPLOAD_FOLDER', 'not set'),
+    }), 200
+
+
+
 # ─── Upload ──────────────────────────────────────────────────
 @app.route('/upload', methods=['POST'])
 @login_required
@@ -451,6 +482,8 @@ def upload_youtube():
         # 1. Try to get automated transcript
         transcript = ""
         try:
+            if not YT_TRANSCRIPT_AVAILABLE:
+                raise RuntimeError('youtube-transcript-api not available on this deployment.')
             transcript_list = YouTubeTranscriptApi.get_transcript(v_id)
             transcript = " ".join([item['text'] for item in transcript_list])
             print(f'[+] Extracted YouTube transcript (API) for {v_id}')
@@ -530,6 +563,8 @@ def download_summary():
     info = context_cache.get(token)
     title = info['filename'] if info else "Video Summary"
     
+    if not FPDF_AVAILABLE:
+        return jsonify({'error': 'PDF generation is not available on this deployment (fpdf2 failed to load).'}), 503
     try:
         class PDF(FPDF):
             def header(self):
