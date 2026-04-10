@@ -111,55 +111,85 @@ def allowed_file(filename: str) -> bool:
 # ═══════════════════════════════════════════════════════════════
 
 def extract_frames_b64(video_path: str, max_frames: int = 6) -> list:
-    import cv2
-    cap = cv2.VideoCapture(video_path)
-    if not cap.isOpened():
-        raise RuntimeError('Cannot open video file with OpenCV.')
-    total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-    fps          = cap.get(cv2.CAP_PROP_FPS) or 24.0
-    duration_s   = total_frames / fps
-    num = max(1, min(max_frames, int(duration_s / 30) + 1))
-    timestamps = [duration_s / 2] if num == 1 else [duration_s * i / (num - 1) for i in range(num)]
+    """
+    Extract evenly-spaced frames from a video file.
+    Tries ffmpeg (via subprocess) first; falls back gracefully if not available.
+    Returns a list of base64-encoded JPEG strings.
+    """
+    import subprocess
+    import tempfile
+    import glob
+    from PIL import Image
+    import io
+
     frames_b64 = []
-    for ts in timestamps:
-        cap.set(cv2.CAP_PROP_POS_MSEC, ts * 1000)
-        ret, frame = cap.read()
-        if not ret:
-            continue
-        h, w = frame.shape[:2]
-        if w > 1024:
-            import cv2 as _cv2
-            frame = _cv2.resize(frame, (1024, int(h * 1024 / w)))
-        _, buf = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 82])
-        frames_b64.append(base64.b64encode(buf).decode('utf-8'))
-    cap.release()
-    print(f'[+] Extracted {len(frames_b64)} frame(s).')
+    try:
+        # Use ffmpeg subprocess — available on most PaaS runtimes including Vercel
+        with tempfile.TemporaryDirectory() as tmpdir:
+            out_pattern = os.path.join(tmpdir, 'frame%03d.jpg')
+            # Extract up to max_frames frames spread across the video
+            cmd = [
+                'ffmpeg', '-i', video_path,
+                '-vf', f'fps=1/15,scale=1024:-2',  # 1 frame every 15s, max 1024px wide
+                '-frames:v', str(max_frames),
+                '-q:v', '5',
+                out_pattern,
+                '-y', '-loglevel', 'error'
+            ]
+            subprocess.run(cmd, check=True, timeout=60)
+            frame_files = sorted(glob.glob(os.path.join(tmpdir, 'frame*.jpg')))
+            for fp in frame_files[:max_frames]:
+                with open(fp, 'rb') as fh:
+                    frames_b64.append(base64.b64encode(fh.read()).decode('utf-8'))
+        print(f'[+] Extracted {len(frames_b64)} frame(s) via ffmpeg.')
+    except (subprocess.CalledProcessError, FileNotFoundError, OSError) as e:
+        print(f'[!] ffmpeg frame extraction unavailable: {e}. Skipping visual analysis.')
+    except Exception as e:
+        print(f'[!] Frame extraction error: {e}. Skipping visual analysis.')
     return frames_b64
 
 
 def transcribe_audio(video_path: str, groq_client) -> str:
+    """
+    Extract audio from video using ffmpeg subprocess and transcribe via Groq Whisper.
+    Gracefully returns an informative message if ffmpeg is unavailable.
+    """
+    import subprocess
     audio_path = video_path + '_audio.mp3'
     try:
-        try:
-            from moviepy.editor import VideoFileClip
-        except ImportError:
-            from moviepy import VideoFileClip
-        clip = VideoFileClip(video_path)
-        if clip.audio is None:
-            clip.close()
-            return '[No audio track found in video.]'
-        clip.audio.write_audiofile(audio_path, verbose=False, logger=None, bitrate='64k', codec='libmp3lame')
-        clip.close()
+        # Extract audio via ffmpeg subprocess (no moviepy/imageio-ffmpeg needed)
+        cmd = [
+            'ffmpeg', '-i', video_path,
+            '-vn',                  # no video
+            '-ar', '16000',         # 16kHz sample rate (Whisper optimal)
+            '-ac', '1',             # mono
+            '-b:a', '64k',
+            '-f', 'mp3',
+            audio_path,
+            '-y', '-loglevel', 'error'
+        ]
+        result = subprocess.run(cmd, check=True, timeout=120, capture_output=True)
+
+        if not os.path.exists(audio_path):
+            return '[Audio extraction produced no output file.]'
+
         if os.path.getsize(audio_path) > 24 * 1024 * 1024:
             os.remove(audio_path)
             return '[Audio too large for Groq Whisper. Visual analysis only.]'
+
         with open(audio_path, 'rb') as f:
-            result = groq_client.audio.transcriptions.create(
+            transcription = groq_client.audio.transcriptions.create(
                 file=(os.path.basename(audio_path), f, 'audio/mpeg'),
                 model=MODEL_WHISPER, response_format='text',
             )
         os.remove(audio_path)
-        return result if isinstance(result, str) else getattr(result, 'text', str(result))
+        return transcription if isinstance(transcription, str) else getattr(transcription, 'text', str(transcription))
+
+    except (subprocess.CalledProcessError, FileNotFoundError, OSError) as e:
+        if os.path.exists(audio_path):
+            try: os.remove(audio_path)
+            except: pass
+        return f'[Audio transcription unavailable — ffmpeg not found or failed: {str(e)[:150]}]'
     except Exception as e:
         if os.path.exists(audio_path):
             try: os.remove(audio_path)
@@ -616,4 +646,5 @@ if __name__ == '__main__':
     print('  VideoMind AI — Groq + Login System')
     print('  Open http://127.0.0.1:5000 in your browser')
     print('=' * 60)
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    port = int(os.environ.get('PORT', 5000))
+    app.run(debug=False, host='0.0.0.0', port=port)

@@ -5,9 +5,8 @@ flask-sqlalchemy==3.1.1
 groq>=0.11.0
 python-dotenv==1.0.1
 Werkzeug==3.0.3
-moviepy
-opencv-python-headless
-imageio-ffmpeg
 youtube-transcript-api
 yt-dlp
 fpdf2
+gunicorn==22.0.0
+Pillow>=10.0.0
