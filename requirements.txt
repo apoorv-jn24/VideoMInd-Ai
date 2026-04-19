@@ -1,10 +1,10 @@
-flask==3.0.3
+Flask==2.3.3
 flask-cors==4.0.1
 flask-login==0.6.3
 flask-sqlalchemy==3.1.1
 groq>=0.11.0
 python-dotenv==1.0.1
-Werkzeug==3.0.3
+Werkzeug==2.3.7
 youtube-transcript-api>=0.6.0,<1.0
 fpdf2
 gunicorn==22.0.0
